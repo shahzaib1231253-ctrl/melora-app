@@ -19,6 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 1. Browser Polling Request
     if (pollUrl) {
       const checkRes = await fetch(pollUrl, {
         headers: { 
@@ -30,16 +31,16 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const response = await fetch("https://api.replicate.com/v1/predictions", {
+    // 2. Initial Music Generation Request (Official MusicGen Model)
+    const response = await fetch("https://api.replicate.com/v1/models/facebook/musicgen/predictions", {
       method: "POST",
       headers: {
         "Authorization": `Token ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "6715d0ee0a17ed9075bef10688d02194d6e9a8b3e20601614804764b882688d6",
         input: {
-          prompt: prompt || "relaxing background piano music",
+          prompt: prompt || "uplifting emotional piano music",
           duration: 10,
           model_version: "stereo-large"
         }
@@ -47,6 +48,11 @@ export default async function handler(req, res) {
     });
 
     const prediction = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: prediction.detail || prediction.error || "Replicate request failed" });
+    }
+
     return res.status(200).json(prediction);
   } catch (err) {
     return res.status(500).json({ error: err.message });
