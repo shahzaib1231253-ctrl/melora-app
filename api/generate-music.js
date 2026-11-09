@@ -7,20 +7,23 @@ export default async function handler(req, res) {
   const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
   if (!REPLICATE_API_TOKEN) {
-    return res.status(500).json({ error: 'Replicate API Token is missing.' });
+    return res.status(500).json({ error: 'Replicate API Key is missing in Vercel Environment Variables.' });
   }
 
   try {
-    // Check status of existing prediction
+    // If browser sends pollUrl, just check prediction status (Instant execution)
     if (pollUrl) {
       const checkRes = await fetch(pollUrl, {
-        headers: { "Authorization": `Token ${REPLICATE_API_TOKEN}` }
+        headers: { 
+          "Authorization": `Token ${REPLICATE_API_TOKEN}`,
+          "Content-Type": "application/json"
+        }
       });
       const data = await checkRes.json();
       return res.status(200).json(data);
     }
 
-    // Start new music generation prediction
+    // Otherwise start new AI prediction (Instant execution)
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -28,10 +31,10 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "b05b1d2681564601810b176370428654d2e557494f7f76d231b5d4e64a3efebd",
+        version: "6715d0ee0a17ed9075bef10688d02194d6e9a8b3e20601614804764b882688d6",
         input: {
           prompt: prompt,
-          duration: 15,
+          duration: 12,
           model_version: "stereo-large"
         }
       })
