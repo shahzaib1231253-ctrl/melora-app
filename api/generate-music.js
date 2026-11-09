@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Check status of running generation
+    // 1. Check status of existing prediction
     if (pollUrl) {
       const checkRes = await fetch(pollUrl, {
         headers: { 
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // 2. Start new generation using explicit prediction version
+    // 2. Start new generation with official active MusicGen hash
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -39,9 +39,9 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: "b05b1d2681564601810b176370428654d2e557494f7f76d231b5d4e64a3efebd",
+        version: "7a0e663a56e89974a1baa043d2211102839492f32644d7b42704b2b36248a474",
         input: {
-          prompt: prompt || "uplifting emotional music",
+          prompt: prompt || "uplifting emotional instrumental music",
           duration: 10,
           model_version: "stereo-large"
         }
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     const prediction = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: prediction.detail || prediction.error || "Failed to create prediction on Replicate" });
+      return res.status(response.status).json({ error: prediction.detail || prediction.error || "Replicate authorization or version error" });
     }
 
     return res.status(200).json(prediction);
