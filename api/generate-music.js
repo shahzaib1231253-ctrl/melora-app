@@ -6,6 +6,10 @@ export default async function handler(req, res) {
   const { prompt } = req.body;
   const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
+  if (!REPLICATE_API_TOKEN) {
+    return res.status(500).json({ error: 'Replicate API Token is missing in Vercel Environment Variables.' });
+  }
+
   try {
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
@@ -24,11 +28,17 @@ export default async function handler(req, res) {
     });
 
     const prediction = await response.json();
-    
+
+    if (prediction.error) {
+      return res.status(500).json({ error: prediction.error });
+    }
+
+    const pollUrl = prediction.urls && prediction.urls.get ? prediction.urls.get : `https://api.replicate.com/v1/predictions/${prediction.id}`;
+
     let songResult = prediction;
     while (songResult.status !== "succeeded" && songResult.status !== "failed") {
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      const checkRes = await fetch(songResult.urls.get, {
+      const checkRes = await fetch(pollUrl, {
         headers: { "Authorization": `Token ${REPLICATE_API_TOKEN}` }
       });
       songResult = await checkRes.json();
@@ -37,7 +47,7 @@ export default async function handler(req, res) {
     if (songResult.status === "succeeded") {
       return res.status(200).json({ audio_url: songResult.output });
     } else {
-      return res.status(500).json({ error: "Music generation failed" });
+      return res.status(500).json({ error: songResult.error || "Music generation failed" });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });
