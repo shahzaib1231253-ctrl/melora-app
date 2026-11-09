@@ -28,7 +28,7 @@ audio{width:100%;margin-top:15px;border-radius:8px}
 <header class="top"><div><div class="brand"><span class="mark">〰</span> MELORA</div><div class="tag">YOUR PERSONAL EMOTIONAL MUSIC COMPANION</div></div><span class="pill">LIVE MVP</span></header>
 <section class="hero"><div class="eyebrow">A SPACE TO FEEL</div><h1>Your feelings deserve<br> a voice.</h1><p>Put what’s on your mind into words. Shape it into a song that feels like yours.</p></section>
 <main class="app">
-<nav class="tabs"><button class="tab active" data-tab="create">✧ &nbsp; Create</button><button class="tab" data-tab="library">♫ &nbsp; My Music</button></nav>
+<nav class="tabs"><button class="tab active">✧ &nbsp; Create</button></nav>
 <section id="create">
 <h2>How are you feeling today?</h2>
 <div class="moods" id="moods">
@@ -64,10 +64,10 @@ document.getElementById('generate').addEventListener('click', async ()=>{
   const player = document.getElementById('audioPlayer');
   
   btn.disabled = true;
-  btn.textContent = "Generating AI Music (approx 30s)...";
+  btn.textContent = "Initiating AI Music Generation...";
   result.classList.add('show');
   document.getElementById('songtitle').textContent = mood + ' — Creating AI Track...';
-  document.getElementById('songdetails').textContent = 'Please wait while AI composes your track...';
+  document.getElementById('songdetails').textContent = 'Submitting prompt to AI engine...';
 
   const prompt = `${style} instrumental music conveying a ${mood} mood. Song language influence: ${lang}. User note: ${story}`;
 
@@ -77,19 +77,49 @@ document.getElementById('generate').addEventListener('click', async ()=>{
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
     });
-    const data = await res.json();
-    if(data.audio_url) {
-      player.src = Array.isArray(data.audio_url) ? data.audio_url[0] : data.audio_url;
+    const prediction = await res.json();
+
+    if (!prediction || prediction.error) {
+      throw new Error(prediction ? prediction.error : 'Failed to start AI music creation.');
+    }
+
+    const pollUrl = prediction.urls && prediction.urls.get ? prediction.urls.get : `https://api.replicate.com/v1/predictions/${prediction.id}`;
+
+    let status = prediction.status;
+    let audioUrl = null;
+    let counter = 0;
+
+    while (status !== "succeeded" && status !== "failed") {
+      counter++;
+      btn.textContent = `Generating AI Music (${counter * 3}s elapsed)...`;
+      document.getElementById('songdetails').textContent = `AI is composing your track (${status}... ${counter * 3}s elapsed)`;
+      
+      await new Promise(r => setTimeout(r, 3000));
+      
+      const checkRes = await fetch('/api/generate-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pollUrl })
+      });
+      const checkData = await checkRes.json();
+      status = checkData.status;
+
+      if (status === "succeeded") {
+        audioUrl = checkData.output;
+      } else if (status === "failed") {
+        throw new Error(checkData.error || 'Music generation failed on AI server.');
+      }
+    }
+
+    if(audioUrl) {
+      player.src = Array.isArray(audioUrl) ? audioUrl[0] : audioUrl;
       document.getElementById('songtitle').textContent = mood + ' — Your AI Song';
       document.getElementById('songdetails').textContent = `${style} · ${lang}`;
       player.play();
-    } else {
-      document.getElementById('songtitle').textContent = 'Generation Failed';
-      document.getElementById('songdetails').textContent = data.error || 'Could not generate audio.';
     }
   } catch(e) {
-    document.getElementById('songtitle').textContent = 'Error';
-    document.getElementById('songdetails').textContent = 'Failed to connect to backend server.';
+    document.getElementById('songtitle').textContent = 'Generation Failed';
+    document.getElementById('songdetails').textContent = e.message || 'Error creating track.';
   } finally {
     btn.disabled = false;
     btn.textContent = "✧   Create My Real AI Song";
